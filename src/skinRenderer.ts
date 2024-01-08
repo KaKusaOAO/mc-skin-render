@@ -10,7 +10,9 @@ type FixedLengthArray<T, L extends number, TObj = [T, ...Array<T>]> =
         [Symbol.iterator]: () => IterableIterator<T>   
     };
 
-export type Vertex = [x: number, y: number, z: number, u: number, v: number];
+export type Vertex = [x: number, y: number, z: number, u: number, v: number, nx: number, ny: number, nz: number];
+type VertexElementCount = Vertex["length"];
+const VERTEX_ELEMENT_COUNT = 8;
 export type Triangle = [a: Vertex, b: Vertex, c: Vertex] & {
     normal?: m4.Vector3
 };
@@ -39,7 +41,7 @@ function createShader(gl: WebGLContext, type: WebGLShaderType, source: string) {
     gl.compileShader(handle);
 
     if (!gl.getShaderParameter(handle, gl.COMPILE_STATUS)) {
-        throw new Error("Failed to compile shader: " + gl.getShaderInfoLog(handle));
+        throw new Error("Failed to compile shader: " + gl.getShaderInfoLog(handle) + "\nSource: " + source);
     }
 
     return handle;
@@ -136,7 +138,7 @@ export class Bone {
 }
 
 export function createSkinVertex(x: number, y: number, z: number, u: number, v: number): Vertex {
-    return [x, y, z, u / 64, v / 64];
+    return [x, y, z, u / 64, v / 64, 0, 0, 0];
 }
 
 export function createCuboid([x, y, z]: m4.Vector3, [width, height, depth]: Size, [u, v]: TexCoord, dilation?: number, options?: CuboidCreateOptions): Cuboid {
@@ -461,24 +463,43 @@ export class SkinRenderer {
         in vec3 vNormal;
         out vec4 outColor;
 
+        vec3 rgb2hsv(vec3 c) {
+            vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+            vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+            vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+
+            float d = q.x - min(q.w, q.y);
+            float e = 1.0e-10;
+            return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+        }
+
+        vec3 hsv2rgb(vec3 c) {
+            vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+            vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+            return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+        }
+
         void main() {
             vec4 color = texture(uTexture, vTexCoord);
             if (color.a == .0) discard;
 
             float a = color.a;
             float diff = max(dot(vNormal, normalize(vec3(0, 0, 1))), 0.0);
-            diff = mix(0.85, 1.05, diff);
+            diff = mix(0.5, 1.05, diff);
 
-            vec3 lightColor = mix(color.rgb, vec3(1, 1, 1), 0.88);
-            vec3 diffuse = diff * lightColor;
+            vec3 hsv = rgb2hsv(color.rgb);
+            vec3 lightColor = hsv2rgb(mix(hsv, vec3(hsv.r, 0, 1.02), 0.9));
+            vec3 darkColor = hsv2rgb(mix(hsv, vec3(hsv.r, 0.8, 0.5), 0.8));
+            vec3 diffuse = mix(darkColor, lightColor, diff);
             vec3 lighten = diffuse * mix(color.rgb, lightColor, 0.125);
             
             outColor = mix(color, vec4(lighten, a), uShadeMix);
-        }            
+        }          
         `;
 
         var vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
         var fragShader = createShader(gl, gl.FRAGMENT_SHADER, fragShaderSource);
+
         var program = createProgram(gl, vertexShader, fragShader);
         gl.useProgram(program);
         this.program = program;
@@ -569,9 +590,9 @@ export class SkinRenderer {
 
     render() {
         var animDuration = 250; // 180;
-        var camTx = Math.sin(Math.PI) * 50;
+        var camTx = 0;
         var camTy = 24;
-        var camTz = Math.cos(Math.PI) * 50;
+        var camTz = -50;
         var globalTranslate = [0, 0, 0];
 
         function transformBone(bone: Bone, mat?: m4.Matrix4x4) {
@@ -637,7 +658,8 @@ export class SkinRenderer {
             var walkAnim = this.noAnim ? 0 : lerp(0, 1, Math.abs(Math.sin(this.seed + performance.now() / animDuration))) * Math.PI;
             globalTranslate[1] = walkAnim * 2;
             
-            var angle = (this.noAnim ? 195 : (Math.sin(performance.now() / 1000 * 160 / animDuration) * 30 + 180)) * Math.PI / 180;
+            // var angle = (this.noAnim ? 195 : (Math.sin(performance.now() / 1000 * 160 / animDuration) * 30 + 180)) * Math.PI / 180;
+            var angle = (performance.now() / 1000 * 16 / 180 + 1) * Math.PI;
             camTx = Math.sin(angle) * 50;
             camTz = Math.cos(angle) * 50;
         } else if (this.poseType == 1) {
@@ -777,10 +799,9 @@ export class SkinRenderer {
                 );
             }
 
-            // Z-sort all faces in cuboids
-            cuboids.forEach(cube => {
-                cube.sort((a, b) => {
-                    // a and b are two faces
+            // Z-sort all faces (triangles) in cuboids
+            cuboids.forEach((cube: Cuboid) => {
+                cube.sort((a: Triangle, b: Triangle) => {
                     var ca = centerOfFace(a);
                     var cb = centerOfFace(b);
                     var camPos = [camTx, camTy, camTz] as m4.Vector3;
@@ -788,27 +809,45 @@ export class SkinRenderer {
                 });
             });
 
-            cuboids.sort((a, b) => {
-                // a and b are two cubes
+            // Z-sort all cuboids in the model
+            cuboids.sort((a: Cuboid, b: Cuboid) => {
                 var ca = a.center!;
                 var cb = b.center!;
                 var camPos = [camTx, 0, camTz] as m4.Vector3;
                 return dist(camPos, cb) - dist(camPos, ca);
             });
 
-            // Normal calculate
-            cuboids.forEach(c => {
-                c.forEach(face => {
-                    var p1 = face[0] as unknown as m4.Vector3;
-                    var p2 = face[1] as unknown as m4.Vector3;
-                    var p3 = face[2] as unknown as m4.Vector3;
-                    var a = m4.subtractVectors(p2, p1);
-                    var b = m4.subtractVectors(p3, p1);
-                    var n = face.normal = m4.cross(a, b);
+            // Calculate the normal of each triangles
+            cuboids.forEach((c: Cuboid) => {
+                c.forEach((face: Triangle) => {
+                    // Deconstruct the triangle into 3 vertices.
+                    let [v1, v2, v3] = face;
 
-                    Array.prototype.push.apply(p1, n);
-                    Array.prototype.push.apply(p2, n);
-                    Array.prototype.push.apply(p3, n);
+                    // We need them casted into m4.Vector3 in order to pass these into m4 functions
+                    let p1 = v1 as unknown as m4.Vector3;
+                    let p2 = v2 as unknown as m4.Vector3;
+                    let p3 = v3 as unknown as m4.Vector3;
+                    
+                    // These operations produces a new array containing 3 elements (x, y, z).
+                    let a = m4.subtractVectors(p2, p1);
+                    let b = m4.subtractVectors(p3, p1);
+                    let n = face.normal = m4.cross(a, b);
+
+                    function setNormal(p: Vertex, normal: m4.Vector3) {
+                        // Vertex layout: x, y, z, u, v, nx, ny, nz
+                        //         Index: 0, 1, 2, 3, 4, 5,  6,  7
+                        p.splice(5);
+                        Array.prototype.push.apply(p, normal);
+
+                        // p[5] = normal[0];
+                        // p[6] = normal[1];
+                        // p[7] = normal[2];
+                    }
+
+                    // Assign the calculated normal back to the vertex
+                    setNormal(v1, n);
+                    setNormal(v2, n);
+                    setNormal(v3, n);
                 });
             });
         }
@@ -821,8 +860,8 @@ export class SkinRenderer {
         var uniforms = this.uniforms;
         var attrs = this.attributes;
 
-        var projMat = m4.perspective(87, canvas.width / canvas.height, 1, 1000);
-        var camMat = m4.scale(m4.lookAt([camTx, camTy, camTz], [0, 0, 0], [0, 1, 0]), 1, -1, 1);
+        var projMat = m4.perspective(60 / 180 * Math.PI, canvas.width / canvas.height, 1, 1000);
+        var camMat = m4.scale(m4.lookAt([camTx, camTy, camTz], [0, 0, 0], [0, 1, 0]), -1, 1, 1);
         var viewMat = m4.inverse(camMat);
         var viewProjMat = m4.multiply(projMat, viewMat);
 
@@ -854,9 +893,9 @@ export class SkinRenderer {
         gl.enableVertexAttribArray(attrs.pos);
         gl.enableVertexAttribArray(attrs.uv);
         gl.enableVertexAttribArray(attrs.normal);
-        gl.vertexAttribPointer(attrs.pos, 3, gl.FLOAT, false, 8 * sizeFloat, 0);
-        gl.vertexAttribPointer(attrs.uv, 2, gl.FLOAT, false, 8 * sizeFloat, 3 * sizeFloat);
-        gl.vertexAttribPointer(attrs.normal, 3, gl.FLOAT, false, 8 * sizeFloat, 5 * sizeFloat);
+        gl.vertexAttribPointer(attrs.pos, 3, gl.FLOAT, false, VERTEX_ELEMENT_COUNT * sizeFloat, 0);
+        gl.vertexAttribPointer(attrs.uv, 2, gl.FLOAT, false, VERTEX_ELEMENT_COUNT * sizeFloat, 3 * sizeFloat);
+        gl.vertexAttribPointer(attrs.normal, 3, gl.FLOAT, false, VERTEX_ELEMENT_COUNT * sizeFloat, 5 * sizeFloat);
         
         gl.drawArrays(gl.TRIANGLES, 0, cuboids.flat(2).length);
     }
