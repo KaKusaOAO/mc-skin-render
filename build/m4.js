@@ -1,7 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.transformVector = exports.lookAt = exports.normalize = exports.subtractVectors = exports.cross = exports.inverse = exports.scale = exports.zRotate = exports.yRotate = exports.xRotate = exports.translate = exports.scaling = exports.zRotation = exports.yRotation = exports.xRotation = exports.translation = exports.multiplyVertex = exports.multiply = exports.projection = exports.perspective = void 0;
-function perspective(fieldOfViewInRadians, aspect, near, far) {
+export function perspective(fieldOfViewInRadians, aspect, near, far) {
     var f = Math.tan(Math.PI * 0.5 - 0.5 * fieldOfViewInRadians);
     var rangeInv = 1.0 / (near - far);
     return [
@@ -11,9 +8,8 @@ function perspective(fieldOfViewInRadians, aspect, near, far) {
         0, 0, near * far * rangeInv * 2, 0,
     ];
 }
-exports.perspective = perspective;
 ;
-function projection(width, height, depth) {
+export function projection(width, height, depth) {
     // Note: This matrix flips the Y axis so 0 is at the top.
     return [
         2 / width, 0, 0, 0,
@@ -22,8 +18,7 @@ function projection(width, height, depth) {
         -1, 1, 0, 1,
     ];
 }
-exports.projection = projection;
-function multiply(a, b) {
+export function multiply(a, b) {
     var a00 = a[0 * 4 + 0];
     var a01 = a[0 * 4 + 1];
     var a02 = a[0 * 4 + 2];
@@ -75,8 +70,7 @@ function multiply(a, b) {
         b30 * a03 + b31 * a13 + b32 * a23 + b33 * a33,
     ];
 }
-exports.multiply = multiply;
-function multiplyVertex(a, b) {
+export function multiplyVertex(a, b) {
     var a00 = a[0 * 4 + 0];
     var a01 = a[0 * 4 + 1];
     var a02 = a[0 * 4 + 2];
@@ -101,8 +95,7 @@ function multiplyVertex(a, b) {
         x * a03 + y * a13 + z * a23 + w * a33,
     ];
 }
-exports.multiplyVertex = multiplyVertex;
-function translation(tx, ty, tz) {
+export function translation(tx, ty, tz) {
     return [
         1, 0, 0, 0,
         0, 1, 0, 0,
@@ -110,8 +103,7 @@ function translation(tx, ty, tz) {
         tx, ty, tz, 1,
     ];
 }
-exports.translation = translation;
-function xRotation(angleInRadians) {
+export function xRotation(angleInRadians) {
     var c = Math.cos(angleInRadians);
     var s = Math.sin(angleInRadians);
     return [
@@ -121,8 +113,7 @@ function xRotation(angleInRadians) {
         0, 0, 0, 1,
     ];
 }
-exports.xRotation = xRotation;
-function yRotation(angleInRadians) {
+export function yRotation(angleInRadians) {
     var c = Math.cos(angleInRadians);
     var s = Math.sin(angleInRadians);
     return [
@@ -132,8 +123,7 @@ function yRotation(angleInRadians) {
         0, 0, 0, 1,
     ];
 }
-exports.yRotation = yRotation;
-function zRotation(angleInRadians) {
+export function zRotation(angleInRadians) {
     var c = Math.cos(angleInRadians);
     var s = Math.sin(angleInRadians);
     return [
@@ -143,8 +133,7 @@ function zRotation(angleInRadians) {
         0, 0, 0, 1,
     ];
 }
-exports.zRotation = zRotation;
-function scaling(sx, sy, sz) {
+export function scaling(sx, sy, sz) {
     return [
         sx, 0, 0, 0,
         0, sy, 0, 0,
@@ -152,28 +141,22 @@ function scaling(sx, sy, sz) {
         0, 0, 0, 1,
     ];
 }
-exports.scaling = scaling;
-function translate(m, tx, ty, tz) {
+export function translate(m, tx, ty, tz) {
     return multiply(m, translation(tx, ty, tz));
 }
-exports.translate = translate;
-function xRotate(m, angleInRadians) {
+export function xRotate(m, angleInRadians) {
     return multiply(m, xRotation(angleInRadians));
 }
-exports.xRotate = xRotate;
-function yRotate(m, angleInRadians) {
+export function yRotate(m, angleInRadians) {
     return multiply(m, yRotation(angleInRadians));
 }
-exports.yRotate = yRotate;
-function zRotate(m, angleInRadians) {
+export function zRotate(m, angleInRadians) {
     return multiply(m, zRotation(angleInRadians));
 }
-exports.zRotate = zRotate;
-function scale(m, sx, sy, sz) {
+export function scale(m, sx, sy, sz) {
     return multiply(m, scaling(sx, sy, sz));
 }
-exports.scale = scale;
-function inverse(m) {
+export function inverse(m) {
     var m00 = m[0 * 4 + 0];
     var m01 = m[0 * 4 + 1];
     var m02 = m[0 * 4 + 2];
@@ -254,20 +237,17 @@ function inverse(m) {
             (tmp_20 * m12 + tmp_23 * m22 + tmp_17 * m02)),
     ];
 }
-exports.inverse = inverse;
-function cross(a, b) {
+export function cross(a, b) {
     return [
         a[1] * b[2] - a[2] * b[1],
         a[2] * b[0] - a[0] * b[2],
         a[0] * b[1] - a[1] * b[0],
     ];
 }
-exports.cross = cross;
-function subtractVectors(a, b) {
+export function subtractVectors(a, b) {
     return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 }
-exports.subtractVectors = subtractVectors;
-function normalize(v) {
+export function normalize(v) {
     var length = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
     // make sure we don't divide by 0.
     if (length > 0.00001) {
@@ -277,8 +257,7 @@ function normalize(v) {
         return [0, 0, 0];
     }
 }
-exports.normalize = normalize;
-function lookAt(cameraPosition, target, up) {
+export function lookAt(cameraPosition, target, up) {
     var zAxis = normalize(subtractVectors(cameraPosition, target));
     var xAxis = normalize(cross(up, zAxis));
     var yAxis = normalize(cross(zAxis, xAxis));
@@ -292,8 +271,7 @@ function lookAt(cameraPosition, target, up) {
         1,
     ];
 }
-exports.lookAt = lookAt;
-function transformVector(m, v) {
+export function transformVector(m, v) {
     var dst = [];
     for (var i = 0; i < 4; ++i) {
         dst[i] = 0.0;
@@ -303,4 +281,3 @@ function transformVector(m, v) {
     }
     return dst;
 }
-exports.transformVector = transformVector;

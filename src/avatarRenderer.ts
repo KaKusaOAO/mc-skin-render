@@ -1,4 +1,4 @@
-import { clamp, createCanvasList, getPixelHex, lerp, log } from "./common";
+import { clamp, createCanvasList, getPixelHex, lerp, log } from "./common.js";
 
 export class AvatarRenderer {
     public skinPath: string;

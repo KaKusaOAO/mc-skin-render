@@ -89,10 +89,9 @@
             </a>
         </div>
     </body>
-    <script src="bundle.js"></script>
-    <script>
-        const { AvatarRenderer } = require("/avatarRenderer.js");
-        const { SkinRenderer } = require("/skinRenderer.js");
+    <script type="module">
+        import { AvatarRenderer } from "./build/avatarRenderer.js";
+        import { SkinRendererFactory } from "./build/skinRenderer/factory.js";
 
         (async () => {
             var skins = [
@@ -133,12 +132,12 @@
                 div.classList.add("skin-item");
                 var skin = skins[i];
 
-                (() => {
-                    var renderer = new SkinRenderer(skin.path, !!skin.slim);
+                await (async () => {
+                    var renderer = await SkinRendererFactory.createPreferred(skin.path, !!skin.slim);
                     renderer.noGrass = noCosmetics;
                     renderer.noEeveeEars = noCosmetics;
                     renderer.noAnim = location.search.indexOf("noAnim") != -1;
-                    var canvas = renderer.createCanvas();
+                    var canvas = await renderer.createCanvas();
 
                     var mult = 1.5; // Math.sqrt(2);
                     canvas.width = 420 * mult;
@@ -168,7 +167,7 @@
                 renderers.forEach(r => {
                     try {
                         r.poseType = 0;
-                        r.render();
+                        r.update();
                     } catch(ex) {
                         console.error(ex);
                         removal.push(r);

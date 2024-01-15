@@ -1,10 +1,10 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.AvatarRenderer = void 0;
-const common_1 = require("./common");
-class AvatarRenderer {
+import { clamp, createCanvasList, getPixelHex, lerp, log } from "./common.js";
+export class AvatarRenderer {
+    skinPath;
+    skin;
+    resolution;
+    noGrass = false;
     constructor(skin) {
-        this.noGrass = false;
         if (typeof skin === "string") {
             this.skinPath = skin;
         }
@@ -62,14 +62,14 @@ class AvatarRenderer {
         var grassData = skinCtx.getImageData(60, 0, 4, 1).data;
         var isGrass = false;
         if (!this.noGrass) {
-            if ((0, common_1.getPixelHex)(grassData, 3) == 0xff3acb28 &&
-                (0, common_1.getPixelHex)(grassData, 2) == 0xfff9ca8b &&
-                (0, common_1.getPixelHex)(grassData, 1) == 0xffff859b) {
+            if (getPixelHex(grassData, 3) == 0xff3acb28 &&
+                getPixelHex(grassData, 2) == 0xfff9ca8b &&
+                getPixelHex(grassData, 1) == 0xffff859b) {
                 isGrass = true;
-                (0, common_1.log)("AvatarRenderer", `Applying grass modification for skin ${skin.src}...`);
+                log("AvatarRenderer", `Applying grass modification for skin ${skin.src}...`);
             }
         }
-        var canvasList = (0, common_1.createCanvasList)(3).map(c => {
+        var canvasList = createCanvasList(3).map(c => {
             c.width = c.height = 8;
             return c;
         });
@@ -90,7 +90,7 @@ class AvatarRenderer {
         }
         var t = ctx.getTransform();
         if (isGrass) {
-            var stemCanvasList = (0, common_1.createCanvasList)(4);
+            var stemCanvasList = createCanvasList(4);
             var [stemCanvas, leadConnCanvas, lLeafCanvas, rLeafCanvas] = stemCanvasList;
             stemCanvas.width = 1;
             stemCanvas.height = 4;
@@ -106,10 +106,10 @@ class AvatarRenderer {
             var px = size / 8;
             var stemOffsetY = 3.2;
             var leafAngle = 45;
-            var leafHeightMult = Math.sin(Math.PI * 2 / 360 * (0, common_1.clamp)(leafAngle, 0, 90));
+            var leafHeightMult = Math.sin(Math.PI * 2 / 360 * clamp(leafAngle, 0, 90));
             var leafWidthMult = 0.75;
-            leafHeightMult = (0, common_1.clamp)(leafHeightMult, 0, 1);
-            var skewAmount = (0, common_1.lerp)(0.4, 0, leafHeightMult);
+            leafHeightMult = clamp(leafHeightMult, 0, 1);
+            var skewAmount = lerp(0.4, 0, leafHeightMult);
             ctx.drawImage(stemCanvas, -px / 2, -size / 2 - px * stemOffsetY, px, px * 4);
             ctx.drawImage(leadConnCanvas, -px, -size / 2 - px * (stemOffsetY + leafHeightMult / 2), px * 2, px * leafHeightMult);
             ctx.translate(-px, -size / 2 - px * stemOffsetY);
@@ -130,4 +130,3 @@ class AvatarRenderer {
         ctx.drawImage(outer, -size / 2, -size / 2, size, size);
     }
 }
-exports.AvatarRenderer = AvatarRenderer;

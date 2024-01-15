@@ -1,85 +1,41 @@
-"use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.SkinRenderer = exports.createCuboidMirrored = exports.createCuboid = exports.createSkinVertex = exports.Bone = void 0;
-const common_1 = require("./common");
-const m4 = __importStar(require("./m4"));
-const VERTEX_ELEMENT_COUNT = 8;
-function createShader(gl, type, source) {
-    var handle = gl.createShader(type);
-    if (!handle)
-        throw new Error("Failed to create a handle for a new shader");
-    gl.shaderSource(handle, source);
-    gl.compileShader(handle);
-    if (!gl.getShaderParameter(handle, gl.COMPILE_STATUS)) {
-        throw new Error("Failed to compile shader: " + gl.getShaderInfoLog(handle) + "\nSource: " + source);
-    }
-    return handle;
-}
-function createProgram(gl, vertexShader, fragShader) {
-    var handle = gl.createProgram();
-    if (!handle)
-        throw new Error("Failed to create a handle for a new program");
-    gl.attachShader(handle, vertexShader);
-    gl.attachShader(handle, fragShader);
-    gl.linkProgram(handle);
-    if (!gl.getProgramParameter(handle, gl.LINK_STATUS)) {
-        throw new Error("Failed to link program: " + gl.getProgramInfoLog(handle));
-    }
-    return handle;
-}
-class Bone {
+import { log, lerp, getPixelHex, getPixel, clamp } from "../common.js";
+import * as m4 from "../m4.js";
+export const VERTEX_ELEMENT_COUNT = 8;
+export class Bone {
+    cuboids;
+    pivot;
+    rotation;
+    children;
+    recursive;
     constructor(cuboids, pivot, rotation, children) {
-        pivot !== null && pivot !== void 0 ? pivot : (pivot = [0, 0, 0]);
-        rotation !== null && rotation !== void 0 ? rotation : (rotation = [0, 0, 0]);
-        children !== null && children !== void 0 ? children : (children = []);
+        pivot ??= [0, 0, 0];
+        rotation ??= [0, 0, 0];
+        children ??= [];
         this.cuboids = cuboids;
         this.pivot = pivot;
         this.rotation = rotation;
         this.children = children;
     }
     transform(mat) {
-        var bone = this;
+        const bone = this;
         if (bone.recursive) {
             throw new Error("Recursive bone setting detected!");
         }
         // mat ??= m4.translation(globalTranslate[0], globalTranslate[1], globalTranslate[2]);
-        var [px, py, pz] = bone.pivot;
-        var [rx, ry, rz] = bone.rotation;
-        var cuboids = bone.cuboids;
-        var matrix = m4.translate(mat, px, py, pz);
+        let [px, py, pz] = bone.pivot;
+        let [rx, ry, rz] = bone.rotation;
+        const cuboids = bone.cuboids;
+        let matrix = m4.translate(mat, px, py, pz);
         matrix = m4.xRotate(matrix, rx);
         matrix = m4.yRotate(matrix, ry);
         matrix = m4.zRotate(matrix, rz);
         cuboids.forEach(cb => {
-            var maxB = [0, 0, 0];
-            var minB = [0, 0, 0];
+            const maxB = [0, 0, 0];
+            const minB = [0, 0, 0];
             cb.forEach(face => {
                 face.forEach(vertex => {
-                    var v = [vertex[0], vertex[1], vertex[2], 1];
-                    var [x, y, z] = m4.multiplyVertex(matrix, v);
+                    const v = [vertex[0], vertex[1], vertex[2], 1];
+                    let [x, y, z] = m4.multiplyVertex(matrix, v);
                     vertex[0] = x;
                     vertex[1] = y;
                     vertex[2] = z;
@@ -102,19 +58,17 @@ class Bone {
         bone.recursive = false;
     }
 }
-exports.Bone = Bone;
-function createSkinVertex(x, y, z, u, v) {
+export function createSkinVertex(x, y, z, u, v) {
     return [x, y, z, u / 64, v / 64, 0, 0, 0];
 }
-exports.createSkinVertex = createSkinVertex;
-function createCuboid([x, y, z], [width, height, depth], [u, v], dilation, options) {
-    dilation !== null && dilation !== void 0 ? dilation : (dilation = 0);
-    options !== null && options !== void 0 ? options : (options = {
+export function createCuboid([x, y, z], [width, height, depth], [u, v], dilation, options) {
+    dilation ??= 0;
+    options ??= {
         grassUvMod: false
-    });
-    var dh = dilation / 2;
-    var { grassUvMod } = options;
-    var result = [
+    };
+    const dh = dilation / 2;
+    let { grassUvMod } = options;
+    const result = [
         // Left
         [
             createSkinVertex(x - dh, y + height + dh, z + depth + dh, u, v + depth),
@@ -189,15 +143,14 @@ function createCuboid([x, y, z], [width, height, depth], [u, v], dilation, optio
     ];
     return result;
 }
-exports.createCuboid = createCuboid;
-function createCuboidMirrored([x, y, z], [width, height, depth], [u, v], dilation, options) {
-    dilation !== null && dilation !== void 0 ? dilation : (dilation = 0);
-    options !== null && options !== void 0 ? options : (options = {
+export function createCuboidMirrored([x, y, z], [width, height, depth], [u, v], dilation, options) {
+    dilation ??= 0;
+    options ??= {
         grassUvMod: false
-    });
-    var dh = dilation / 2;
-    var { grassUvMod } = options;
-    var result = [
+    };
+    const dh = dilation / 2;
+    let { grassUvMod } = options;
+    const result = [
         // Left
         [
             createSkinVertex(x - dh, y + height + dh, z + depth + dh, u + depth + width + depth, v + depth),
@@ -272,17 +225,34 @@ function createCuboidMirrored([x, y, z], [width, height, depth], [u, v], dilatio
     ];
     return result;
 }
-exports.createCuboidMirrored = createCuboidMirrored;
-class SkinRenderer {
+export class SkinRenderer {
+    // public uniforms: KDict<WebGLUniformLocation>;
+    // public attributes: KDict<WebGLAttribLocation>;
+    isSlim;
+    skinPath;
+    skin;
+    noGrass;
+    noEeveeEars;
+    noAnim;
+    isGrass;
+    isEeveeEars;
+    modifyInnerHead;
+    modifyOuterHead;
+    seed;
+    canvas;
+    // public context?: WebGLContext;
+    // public program?: WebGLProgram;
+    // public texture?: WebGLTexture;
+    // public vertexBuffer?: WebGLBuffer;
+    poseType = 0;
+    mousePos = [0, 0];
+    mousePosO = null;
+    mousePosRaw = [0, 0];
     constructor(skin, slim) {
-        this.poseType = 0;
-        this.mousePos = [0, 0];
-        this.mousePosO = null;
-        this.mousePosRaw = [0, 0];
         this.isSlim = slim;
         if (typeof skin === "string") {
             this.skinPath = skin;
-            var img = new Image();
+            const img = new Image();
             img.src = skin;
             this.skin = img;
         }
@@ -293,8 +263,6 @@ class SkinRenderer {
         else {
             throw new Error("Invalid skin argument");
         }
-        this.uniforms = {};
-        this.attributes = {};
         this.noAnim = false;
         this.noGrass = false;
         this.isGrass = false;
@@ -305,33 +273,33 @@ class SkinRenderer {
         this.seed = Math.random() * 20480;
     }
     parseTexture() {
-        var skinCanvas = document.createElement("canvas");
-        var skinCtx = skinCanvas.getContext("2d");
-        var skin = this.skin;
+        const skinCanvas = document.createElement("canvas");
+        const skinCtx = skinCanvas.getContext("2d");
+        const skin = this.skin;
         skinCtx.canvas.width = skin.width;
         skinCtx.canvas.height = skin.height;
         skinCtx.drawImage(skin, 0, 0);
-        var grassData = skinCtx.getImageData(60, 0, 4, 1).data;
-        var isGrass = false;
-        var modifyInnerHead = false;
-        var modifyOuterHead = false;
-        var validModifier = true;
-        if ((0, common_1.getPixelHex)(grassData, 3) == 0xff3acb28 &&
-            (0, common_1.getPixelHex)(grassData, 2) == 0xfff9ca8b &&
-            (0, common_1.getPixelHex)(grassData, 1) == 0xffff859b) {
+        const grassData = skinCtx.getImageData(60, 0, 4, 1).data;
+        let isGrass = false;
+        let modifyInnerHead = false;
+        let modifyOuterHead = false;
+        let validModifier = true;
+        if (getPixelHex(grassData, 3) == 0xff3acb28 &&
+            getPixelHex(grassData, 2) == 0xfff9ca8b &&
+            getPixelHex(grassData, 1) == 0xffff859b) {
             isGrass = true;
-            (0, common_1.log)("SkinParse", `Identified valid grass skin: ${skin.src}`);
-            var modifier = (0, common_1.getPixel)(grassData, 0);
+            log("SkinParse", `Identified valid grass skin: ${skin.src}`);
+            const modifier = getPixel(grassData, 0);
             if (modifier[3] == 0xff && modifier[0] == 0xff) {
                 if (modifier[1] == 0xfe) {
-                    (0, common_1.log)("SkinParse", `Will modify inner head UV for this skin`);
+                    log("SkinParse", `Will modify inner head UV for this skin`);
                     modifyInnerHead = true;
                 }
                 else {
                     validModifier = modifier[1] == 0xff;
                 }
                 if (modifier[2] == 0xfe) {
-                    (0, common_1.log)("SkinParse", `Will modify outer head UV for this skin`);
+                    log("SkinParse", `Will modify outer head UV for this skin`);
                     modifyOuterHead = true;
                 }
                 else {
@@ -339,108 +307,26 @@ class SkinRenderer {
                 }
             }
         }
-        else if ((0, common_1.getPixelHex)(grassData, 3) == 0xff51280c &&
-            (0, common_1.getPixelHex)(grassData, 2) == 0xffc5a068 &&
-            (0, common_1.getPixelHex)(grassData, 1) == 0xffd8c5a1) {
+        else if (getPixelHex(grassData, 3) == 0xff51280c &&
+            getPixelHex(grassData, 2) == 0xffc5a068 &&
+            getPixelHex(grassData, 1) == 0xffd8c5a1) {
             this.isEeveeEars = true;
-            (0, common_1.log)("SkinParse", `Identified valid eevee ears skin: ${skin.src}`);
+            log("SkinParse", `Identified valid eevee ears skin: ${skin.src}`);
         }
         this.isGrass = isGrass;
         this.modifyInnerHead = modifyInnerHead && validModifier;
         this.modifyOuterHead = modifyOuterHead && validModifier;
     }
-    createCanvas() {
-        var canvas = document.createElement("canvas");
-        var gl = canvas.getContext("webgl2", {
-            antialias: false
-        });
-        if (!gl)
-            throw new Error("WebGL is not supported");
-        this.context = gl;
-        var vertexShaderSource = `#version 300 es
-        in vec3 aPos;
-        in vec2 aTexCoord;
-        in vec3 aNormal;
-        
-        uniform mat4 uMatrix;
-
-        out vec2 vTexCoord;
-        out vec3 vNormal;
-        
-        void main() {
-            gl_Position = uMatrix * vec4(aPos, 1);
-            vTexCoord = aTexCoord;
-            vNormal = normalize(aNormal);
-        }            
-        `;
-        var fragShaderSource = `#version 300 es
-        precision highp float;
-        
-        uniform sampler2D uTexture;
-        uniform float uShadeMix;
-
-        in vec2 vTexCoord;
-        in vec3 vNormal;
-        out vec4 outColor;
-
-        vec3 rgb2hsv(vec3 c) {
-            vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
-            vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
-            vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
-
-            float d = q.x - min(q.w, q.y);
-            float e = 1.0e-10;
-            return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
-        }
-
-        vec3 hsv2rgb(vec3 c) {
-            vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-            vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-            return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-        }
-
-        void main() {
-            vec4 color = texture(uTexture, vTexCoord);
-            if (color.a == .0) discard;
-
-            float a = color.a;
-            float diff = max(dot(vNormal, normalize(vec3(0, 0, 1))), 0.0);
-            diff = mix(0.5, 1.05, diff);
-
-            vec3 hsv = rgb2hsv(color.rgb);
-            vec3 lightColor = hsv2rgb(mix(hsv, vec3(hsv.r, 0, 1.02), 0.9));
-            vec3 darkColor = hsv2rgb(mix(hsv, vec3(hsv.r, 0.8, 0.5), 0.8));
-            vec3 diffuse = mix(darkColor, lightColor, diff);
-            vec3 lighten = diffuse * mix(color.rgb, lightColor, 0.125);
-            
-            outColor = mix(color, vec4(lighten, a), uShadeMix);
-        }          
-        `;
-        var vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
-        var fragShader = createShader(gl, gl.FRAGMENT_SHADER, fragShaderSource);
-        var program = createProgram(gl, vertexShader, fragShader);
-        gl.useProgram(program);
-        this.program = program;
-        var tex = gl.createTexture();
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, tex);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([
-            0, 0, 0, 255,
-            255, 0, 255, 255,
-            255, 0, 255, 255,
-            0, 0, 0, 255,
-        ]));
-        var loadTexture = () => {
+    async createCanvas() {
+        const canvas = document.createElement("canvas");
+        this.canvas = canvas;
+        this.earlySetupCanvas();
+        const loadTexture = () => {
             requestAnimationFrame(() => {
-                if (gl == null)
-                    throw new Error();
                 this.parseTexture();
-                (0, common_1.log)("SkinRenderer", "Uploading texture data: " + this.skin.src);
-                gl.activeTexture(gl.TEXTURE0);
-                gl.bindTexture(gl.TEXTURE_2D, tex);
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.skin);
-                // This is required
-                gl.generateMipmap(gl.TEXTURE_2D);
+                log("SkinRenderer", "Uploading texture data: " + this.skin.src);
+                CanvasRenderingContext2D;
+                this.uploadSkinTextureData(this.skin);
             });
         };
         if (this.skin.complete) {
@@ -449,32 +335,19 @@ class SkinRenderer {
         else {
             this.skin.onload = () => loadTexture();
         }
-        this.texture = tex;
-        var program = this.program;
-        var uniforms = this.uniforms;
-        var attrs = this.attributes;
-        uniforms.matrix = gl.getUniformLocation(program, "uMatrix");
-        uniforms.texture = gl.getUniformLocation(program, "uTexture");
-        uniforms.shadeMix = gl.getUniformLocation(program, "uShadeMix");
-        attrs.pos = gl.getAttribLocation(program, "aPos");
-        attrs.uv = gl.getAttribLocation(program, "aTexCoord");
-        attrs.normal = gl.getAttribLocation(program, "aNormal");
-        var vertexBuffer = gl.createBuffer();
-        this.vertexBuffer = vertexBuffer;
-        this.canvas = canvas;
         document.addEventListener("mousemove", ev => {
-            var x = ev.clientX;
-            var y = ev.clientY;
+            const x = ev.clientX;
+            const y = ev.clientY;
             this.mousePosRaw = [x, y];
         });
         document.addEventListener("touchmove", ev => {
-            var x = ev.touches[0].clientX;
-            var y = ev.touches[0].clientY;
+            const x = ev.touches[0].clientX;
+            const y = ev.touches[0].clientY;
             this.mousePosRaw = [x, y];
         });
-        var mrf = () => {
-            var rect = this.canvas.getBoundingClientRect();
-            var [x, y] = this.mousePosRaw;
+        const mrf = () => {
+            const rect = this.canvas.getBoundingClientRect();
+            let [x, y] = this.mousePosRaw;
             x = (x - rect.left - rect.width / 2 - document.documentElement.scrollLeft) / (rect.width / 2);
             y = 1 - (y - rect.top - document.documentElement.scrollTop) / rect.height * 2;
             y += -0.2;
@@ -483,35 +356,36 @@ class SkinRenderer {
                 this.mousePosO = [x, y];
             }
             else {
-                var pg = 0.15;
+                const pg = 0.15;
                 this.mousePosO = [
-                    (0, common_1.lerp)(this.mousePosO[0], x, pg),
-                    (0, common_1.lerp)(this.mousePosO[1], y, pg),
+                    lerp(this.mousePosO[0], x, pg),
+                    lerp(this.mousePosO[1], y, pg),
                 ];
             }
         };
         setInterval(() => mrf(), 16);
         return canvas;
     }
-    render() {
-        var _a;
-        var animDuration = 250; // 180;
-        var camTx = 0;
-        var camTy = 24;
-        var camTz = -50;
-        var globalTranslate = [0, 0, 0];
+    earlySetupCanvas() {
+    }
+    update() {
+        const animDuration = 250; // 180;
+        let camTx = 0;
+        let camTy = 24;
+        let camTz = -50;
+        const globalTranslate = [0, 0, 0];
         function transformBone(bone, mat) {
-            mat !== null && mat !== void 0 ? mat : (mat = m4.translation(globalTranslate[0], globalTranslate[1], globalTranslate[2]));
+            mat ??= m4.translation(globalTranslate[0], globalTranslate[1], globalTranslate[2]);
             bone.transform(mat);
         }
         function createBone(cuboids, pivot, rotation, children) {
-            pivot !== null && pivot !== void 0 ? pivot : (pivot = [0, 0, 0]);
-            rotation !== null && rotation !== void 0 ? rotation : (rotation = [0, 0, 0]);
-            children !== null && children !== void 0 ? children : (children = []);
+            pivot ??= [0, 0, 0];
+            rotation ??= [0, 0, 0];
+            children ??= [];
             return new Bone(cuboids, pivot, rotation, children);
         }
-        var yOffset = -20;
-        var pose = {
+        const yOffset = -20;
+        let pose = {
             head: [0, 0, 0],
             body: [0, 0, 0],
             bodyInv: [0, 0, 0],
@@ -520,12 +394,12 @@ class SkinRenderer {
             leftLeg: [0, 0, 0],
             rightLeg: [0, 0, 0]
         };
-        var fn = (n, i) => {
-            i !== null && i !== void 0 ? i : (i = 1);
-            var a = 0;
-            var b = 0;
-            var f = Math.floor(i);
-            var c = Math.ceil(i);
+        const fn = (n, i) => {
+            i ??= 1;
+            let a = 0;
+            let b = 0;
+            const f = Math.floor(i);
+            const c = Math.ceil(i);
             for (var j = 0; j < f; j++) {
                 n = n * n * (3 - 2 * n);
             }
@@ -536,12 +410,12 @@ class SkinRenderer {
                 n = n * n * (3 - 2 * n);
             }
             b = n;
-            return (0, common_1.lerp)(a, b, i - f);
+            return lerp(a, b, i - f);
         };
         if (this.poseType == 0) {
-            var anim = this.noAnim ? -Math.PI / 4 : (0, common_1.lerp)(-1, 1, fn(Math.sin(this.seed + performance.now() / animDuration) / 2 + 0.5, 0.25)) * Math.PI / 2.5;
-            var headAnim = this.noAnim ? -Math.PI / 4 : (0, common_1.lerp)(-1, 1, fn(Math.sin(this.seed + performance.now() / animDuration * 2) / 2 + 0.5, 0.25)) * Math.PI / 2.5;
-            var bodyRotY = anim * 0.125;
+            const anim = this.noAnim ? -Math.PI / 4 : lerp(-1, 1, fn(Math.sin(this.seed + performance.now() / animDuration) / 2 + 0.5, 0.25)) * Math.PI / 2.5;
+            const headAnim = this.noAnim ? -Math.PI / 4 : lerp(-1, 1, fn(Math.sin(this.seed + performance.now() / animDuration * 2) / 2 + 0.5, 0.25)) * Math.PI / 2.5;
+            const bodyRotY = anim * 0.125;
             pose = {
                 head: [-headAnim * 0.125, anim * 0.125, 0],
                 body: [0, bodyRotY, 0],
@@ -551,28 +425,28 @@ class SkinRenderer {
                 leftLeg: [-anim, 0, 0],
                 rightLeg: [anim, 0, 0],
             };
-            var walkAnim = this.noAnim ? 0 : (0, common_1.lerp)(0, 1, Math.abs(Math.sin(this.seed + performance.now() / animDuration))) * Math.PI;
+            const walkAnim = this.noAnim ? 0 : lerp(0, 1, Math.abs(Math.sin(this.seed + performance.now() / animDuration))) * Math.PI;
             globalTranslate[1] = walkAnim * 2;
             // var angle = (this.noAnim ? 195 : (Math.sin(performance.now() / 1000 * 160 / animDuration) * 30 + 180)) * Math.PI / 180;
-            var angle = (performance.now() / 1000 * 16 / 180 + 1) * Math.PI;
+            const angle = (performance.now() / 1000 * 16 / 180 + 1) * Math.PI;
             camTx = Math.sin(angle) * 50;
             camTz = Math.cos(angle) * 50;
         }
         else if (this.poseType == 1) {
-            var [mx, my] = (_a = this.mousePosO) !== null && _a !== void 0 ? _a : [0, 0];
-            var yaw = fn((0, common_1.clamp)((mx / 12 + 1) / 2, 0, 1), 2.5);
-            var pitch = fn((0, common_1.clamp)((my / 12 + 1) / 2, 0, 1), 2.5);
-            var xRot = (0, common_1.lerp)(-Math.PI / 2.25, Math.PI / 2.25, pitch);
-            var yRot = (0, common_1.lerp)(Math.PI / 2.25, -Math.PI / 2.25, yaw);
-            var bodyXRot = xRot; // Math.min(0, xRot);
+            let [mx, my] = this.mousePosO ?? [0, 0];
+            const yaw = fn(clamp((mx / 12 + 1) / 2, 0, 1), 2.5);
+            const pitch = fn(clamp((my / 12 + 1) / 2, 0, 1), 2.5);
+            const xRot = lerp(-Math.PI / 2.25, Math.PI / 2.25, pitch);
+            const yRot = lerp(Math.PI / 2.25, -Math.PI / 2.25, yaw);
+            const bodyXRot = xRot; // Math.min(0, xRot);
             pose.head = [xRot / 1.5, yRot / 1.5, 0];
             pose.body = [bodyXRot, yRot / 2, 0];
             pose.bodyInv = [-bodyXRot, -yRot / 2, 0];
             camTy = 12;
         }
-        var headBone;
-        var outerDilation = 0.5;
-        var bones = [
+        let headBone;
+        const outerDilation = 0.5;
+        const bones = [
             createBone([
                 // Body (inner / outer)
                 createCuboid([-4, 0, -2], [8, 12, 4], [16, 16], 0.01),
@@ -646,7 +520,7 @@ class SkinRenderer {
                 createCuboid([1, 6, -0.5], [3, 1, 1], [56, 41]),
             ], [1.5, 7, 0], [12.5 * Math.PI / 180, -7.5 * Math.PI / 180, -17.5 * Math.PI / 180]));
         }
-        var allBones = [];
+        const allBones = [];
         function addBonesToList(bone) {
             allBones.push(bone);
             bone.children.forEach(b => addBonesToList(b));
@@ -658,12 +532,12 @@ class SkinRenderer {
         var cuboids = allBones.flatMap(b => b.cuboids);
         function prepareCuboids(cuboids) {
             function centerOfFace(face) {
-                var vectorA = face[0];
-                var vectorB = face[1];
-                var vectorC = face[2];
-                var centerX = ((vectorA[0] + vectorB[0] + vectorC[0]) / 3);
-                var centerY = ((vectorA[1] + vectorB[1] + vectorC[1]) / 3);
-                var centerZ = ((vectorA[2] + vectorB[2] + vectorC[2]) / 3);
+                const vectorA = face[0];
+                const vectorB = face[1];
+                const vectorC = face[2];
+                const centerX = ((vectorA[0] + vectorB[0] + vectorC[0]) / 3);
+                const centerY = ((vectorA[1] + vectorB[1] + vectorC[1]) / 3);
+                const centerZ = ((vectorA[2] + vectorB[2] + vectorC[2]) / 3);
                 return [centerX, centerY, centerZ];
             }
             function dist(a, b) {
@@ -674,17 +548,17 @@ class SkinRenderer {
             // Z-sort all faces (triangles) in cuboids
             cuboids.forEach((cube) => {
                 cube.sort((a, b) => {
-                    var ca = centerOfFace(a);
-                    var cb = centerOfFace(b);
-                    var camPos = [camTx, camTy, camTz];
+                    const ca = centerOfFace(a);
+                    const cb = centerOfFace(b);
+                    const camPos = [camTx, camTy, camTz];
                     return dist(camPos, cb) - dist(camPos, ca);
                 });
             });
             // Z-sort all cuboids in the model
             cuboids.sort((a, b) => {
-                var ca = a.center;
-                var cb = b.center;
-                var camPos = [camTx, 0, camTz];
+                const ca = a.center;
+                const cb = b.center;
+                const camPos = [camTx, 0, camTz];
                 return dist(camPos, cb) - dist(camPos, ca);
             });
             // Calculate the normal of each triangles
@@ -718,42 +592,6 @@ class SkinRenderer {
         }
         prepareCuboids(cuboids);
         // Start rendering
-        var canvas = this.canvas;
-        var gl = this.context;
-        var uniforms = this.uniforms;
-        var attrs = this.attributes;
-        var projMat = m4.perspective(60 / 180 * Math.PI, canvas.width / canvas.height, 1, 1000);
-        var camMat = m4.scale(m4.lookAt([camTx, camTy, camTz], [0, 0, 0], [0, 1, 0]), -1, 1, 1);
-        var viewMat = m4.inverse(camMat);
-        var viewProjMat = m4.multiply(projMat, viewMat);
-        gl.viewport(0, 0, canvas.width, canvas.height);
-        gl.clearColor(0, 0, 0, 0);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        gl.enable(gl.DEPTH_TEST);
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-        // Matrix uniform
-        gl.uniformMatrix4fv(uniforms.matrix, false, m4.translate(viewProjMat, 0, 0, 0));
-        // Shade?
-        gl.uniform1f(uniforms.shadeMix, 1);
-        // Texture filters
-        gl.bindTexture(gl.TEXTURE_2D, this.texture);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-        gl.uniform1i(uniforms.texture, 0);
-        var vertexBuffer = this.vertexBuffer;
-        var sizeFloat = Float32Array.BYTES_PER_ELEMENT;
-        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cuboids.flat(3)), gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(attrs.pos);
-        gl.enableVertexAttribArray(attrs.uv);
-        gl.enableVertexAttribArray(attrs.normal);
-        gl.vertexAttribPointer(attrs.pos, 3, gl.FLOAT, false, VERTEX_ELEMENT_COUNT * sizeFloat, 0);
-        gl.vertexAttribPointer(attrs.uv, 2, gl.FLOAT, false, VERTEX_ELEMENT_COUNT * sizeFloat, 3 * sizeFloat);
-        gl.vertexAttribPointer(attrs.normal, 3, gl.FLOAT, false, VERTEX_ELEMENT_COUNT * sizeFloat, 5 * sizeFloat);
-        gl.drawArrays(gl.TRIANGLES, 0, cuboids.flat(2).length);
+        this.render({ camTx, camTy, camTz, cuboids });
     }
 }
-exports.SkinRenderer = SkinRenderer;
