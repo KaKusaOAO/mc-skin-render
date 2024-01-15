@@ -595,3 +595,4 @@ export class SkinRenderer {
         this.render({ camTx, camTy, camTz, cuboids });
     }
 }
+//# sourceMappingURL=base.js.map

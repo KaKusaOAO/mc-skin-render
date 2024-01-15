@@ -130,3 +130,4 @@ export class AvatarRenderer {
         ctx.drawImage(outer, -size / 2, -size / 2, size, size);
     }
 }
+//# sourceMappingURL=avatarRenderer.js.map

@@ -14,3 +14,4 @@ export const SkinRendererFactory = {
         return new WebGPUSkinRenderer(skin, slim);
     }
 };
+//# sourceMappingURL=factory.js.map

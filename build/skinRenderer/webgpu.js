@@ -434,3 +434,4 @@ export class WebGPUSkinRenderer extends SkinRenderer {
         // gl.drawArrays(gl.TRIANGLES, 0, cuboids.flat(2).length);
     }
 }
+//# sourceMappingURL=webgpu.js.map

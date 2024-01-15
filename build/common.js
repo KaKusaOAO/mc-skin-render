@@ -37,3 +37,4 @@ export function getPixelHex(data, index) {
     var hex = vLShift(c[3], 24) + vLShift(c[0], 16) + vLShift(c[1], 8) + c[2];
     return hex;
 }
+//# sourceMappingURL=common.js.map
