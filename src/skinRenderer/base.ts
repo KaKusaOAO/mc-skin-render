@@ -306,7 +306,7 @@ export abstract class SkinRenderer {
     public mousePosO: [x: number, y: number] | null = null;
     public mousePosRaw: [x: number, y: number] = [0, 0];
 
-    constructor(skin: typeof Image | string, slim: boolean) {
+    constructor(skin: HTMLImageElement | string, slim: boolean) {
         this.isSlim = slim;
         if (typeof skin === "string") {
             this.skinPath = skin;
@@ -314,7 +314,7 @@ export abstract class SkinRenderer {
             const img = new Image();
             img.src = skin;
             this.skin = img;
-        } else if (skin instanceof Image) {
+        } else if (skin instanceof HTMLImageElement) {
             this.skinPath = skin.src;
             this.skin = skin;
         } else {

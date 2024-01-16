@@ -256,7 +256,7 @@ export class SkinRenderer {
             img.src = skin;
             this.skin = img;
         }
-        else if (skin instanceof Image) {
+        else if (skin instanceof HTMLImageElement) {
             this.skinPath = skin.src;
             this.skin = skin;
         }

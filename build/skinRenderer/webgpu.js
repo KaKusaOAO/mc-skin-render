@@ -123,7 +123,12 @@ export class WebGPUSkinRenderer extends SkinRenderer {
                 
                 var hsv = rgb2hsv(color.rgb);
                 var lightColor = hsv2rgb(mix(hsv, vec3f(hsv.r, 0, 1.02), 0.9));
-                var darkColor = hsv2rgb(mix(hsv, vec3f(hsv.r, 0.8, 0.5), 0.8));
+                var darkColorHsv = mix(hsv, vec3f(hsv.r, 0.8, 0.5), 0.8);
+                
+                // Clear the saturation if there was no saturation originally
+                darkColorHsv = mix(vec3f(darkColorHsv.r, 0.0, darkColorHsv.b), darkColorHsv, step(1.0e-10, hsv.g));
+                var darkColor = hsv2rgb(darkColorHsv);
+                
                 var diffuse = mix(darkColor, lightColor, diff);
                 var lighten = diffuse * mix(color.rgb, lightColor, 0.125);
                 

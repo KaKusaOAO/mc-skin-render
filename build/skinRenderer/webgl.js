@@ -108,7 +108,12 @@ export class WebGLSkinRenderer extends SkinRenderer {
 
             vec3 hsv = rgb2hsv(color.rgb);
             vec3 lightColor = hsv2rgb(mix(hsv, vec3(hsv.r, 0, 1.02), 0.9));
-            vec3 darkColor = hsv2rgb(mix(hsv, vec3(hsv.r, 0.8, 0.5), 0.8));
+            vec3 darkColorHsv = mix(hsv, vec3(hsv.r, 0.8, 0.5), 0.8);
+                
+            // Clear the saturation if there was no saturation originally
+            darkColorHsv = mix(vec3(darkColorHsv.r, 0.0, darkColorHsv.b), darkColorHsv, step(1.0e-10, hsv.g));
+            vec3 darkColor = hsv2rgb(darkColorHsv);
+            
             vec3 diffuse = mix(darkColor, lightColor, diff);
             vec3 lighten = diffuse * mix(color.rgb, lightColor, 0.125);
             
