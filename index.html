@@ -143,9 +143,13 @@
 
                 await (async () => {
                     var renderer = await SkinRendererFactory.createPreferred(skin.path, !!skin.slim);
+                    renderer.noAnim = location.search.indexOf("noAnim") != -1;
+                    
                     renderer.noGrass = noCosmetics;
                     renderer.noEeveeEars = noCosmetics;
-                    renderer.noAnim = location.search.indexOf("noAnim") != -1;
+                    renderer.noCatEars = noCosmetics;
+                    renderer.noCatTail = noCosmetics;
+                    
                     var canvas = await renderer.createCanvas();
 
                     var mult = 1.5; // Math.sqrt(2);
