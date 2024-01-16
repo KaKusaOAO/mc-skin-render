@@ -101,6 +101,10 @@
                     slim: true
                 },
                 {
+                    path: "staff/Yuru7560_TW.png",
+                    slim: true
+                },
+                {
                     path: "staff/2eb73c01b9012565.png",
                     slim: true
                 },
@@ -115,10 +119,6 @@
                 // {
                 //     path: "staff/yunari930.png" 
                 // },
-                {
-                    path: "staff/Yuru7560_TW.png",
-                    slim: true
-                },
                 {
                     path: "staff/komugimeow.png",
                     slim: true
@@ -144,7 +144,7 @@
                 await (async () => {
                     var renderer = await SkinRendererFactory.createPreferred(skin.path, !!skin.slim);
                     renderer.noAnim = location.search.indexOf("noAnim") != -1;
-                    
+
                     renderer.noGrass = noCosmetics;
                     renderer.noEeveeEars = noCosmetics;
                     renderer.noCatEars = noCosmetics;

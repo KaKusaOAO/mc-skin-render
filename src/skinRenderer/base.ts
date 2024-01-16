@@ -358,9 +358,14 @@ export abstract class SkinRenderer {
     }
 
     public parseTexture() {
+        const skin = this.skin;
+        if (skin.width != 64 && skin.height != 64) {
+            warn("SkinParse", `Bad skin dimension! (${skin.width}, ${skin.height}) Expecting 64x64.`);
+            return;
+        }
+
         const skinCanvas = document.createElement("canvas");
         const skinCtx = skinCanvas.getContext("2d")!;
-        const skin = this.skin;
         skinCtx.canvas.width = skin.width;
         skinCtx.canvas.height = skin.height;
         skinCtx.drawImage(skin, 0, 0);
