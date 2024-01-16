@@ -3,7 +3,7 @@ import { WebGLSkinRenderer } from "./webgl.js";
 import { WebGPUSkinRenderer } from "./webgpu.js";
 
 export const SkinRendererFactory = { 
-    createPreferred(skin: typeof Image | string, slim: boolean): Promise<SkinRenderer> {
+    createPreferred(skin: HTMLImageElement | string, slim: boolean): Promise<SkinRenderer> {
         if (!navigator.gpu) {
             return SkinRendererFactory.createWebGL(skin, slim);
         }
@@ -11,11 +11,11 @@ export const SkinRendererFactory = {
         return SkinRendererFactory.createWebGPU(skin, slim);
     },
 
-    async createWebGL(skin: typeof Image | string, slim: boolean): Promise<WebGLSkinRenderer> {
+    async createWebGL(skin: HTMLImageElement | string, slim: boolean): Promise<WebGLSkinRenderer> {
         return new WebGLSkinRenderer(skin, slim);
     },
 
-    async createWebGPU(skin: typeof Image | string, slim: boolean): Promise<WebGPUSkinRenderer> {
+    async createWebGPU(skin: HTMLImageElement | string, slim: boolean): Promise<WebGPUSkinRenderer> {
         return new WebGPUSkinRenderer(skin, slim);
     }
 }

@@ -25,6 +25,10 @@ export function log(name, ...args) {
     var fn = console.log.bind(console, `%c %c ${name} %c `, "background: #f8a; font-weight: bold;", "background: #f58; color: #fff; font-weight: bold;", "background: #f8a; font-weight: bold;");
     fn.apply(console, args);
 }
+export function warn(name, ...args) {
+    var fn = console.warn.bind(console, `%c %c ${name} %c `, "background: #f8a; font-weight: bold;", "background: #f58; color: #fff; font-weight: bold;", "background: #f8a; font-weight: bold;");
+    fn.apply(console, args);
+}
 export function clamp(val, min, max) {
     return val > max ? max : (val < min ? min : val);
 }

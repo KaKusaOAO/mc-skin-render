@@ -92,6 +92,7 @@
     <script type="module">
         import { AvatarRenderer } from "./build/avatarRenderer.js";
         import { SkinRendererFactory } from "./build/skinRenderer/factory.js";
+        import { PoseType } from "./build/skinRenderer/base.js";
 
         (async () => {
             var skins = [
@@ -100,16 +101,20 @@
                     slim: true
                 },
                 {
-                    path: "staff/Yukari11_.png",
+                    path: "staff/2eb73c01b9012565.png",
                     slim: true
                 },
-                {
-                    path: "staff/Kiuryil2595.png",
-                    slim: true
-                },
-                {
-                    path: "staff/yunari930.png" 
-                },
+                // {
+                //     path: "staff/Yukari11_.png",
+                //     slim: true
+                // },
+                // {
+                //     path: "staff/Kiuryil2595.png",
+                //     slim: true
+                // },
+                // {
+                //     path: "staff/yunari930.png" 
+                // },
                 {
                     path: "staff/Yuru7560_TW.png",
                     slim: true
@@ -118,6 +123,10 @@
                     path: "staff/komugimeow.png",
                     slim: true
                 },
+                {
+                    path: "staff/Support1NO.png",
+                    slim: true
+                }
             ];
 
             var noCosmetics = location.search.indexOf("noGrass") != -1 || 
@@ -166,7 +175,7 @@
                 var removal = [];
                 renderers.forEach(r => {
                     try {
-                        r.poseType = 0;
+                        r.poseType = PoseType.Walk; // BackLookAtMouseCursor;
                         r.update();
                     } catch(ex) {
                         console.error(ex);

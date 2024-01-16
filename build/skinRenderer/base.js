@@ -1,4 +1,4 @@
-import { log, lerp, getPixelHex, getPixel, clamp } from "../common.js";
+import { log, warn, lerp, getPixelHex, getPixel, clamp } from "../common.js";
 import * as m4 from "../m4.js";
 export const VERTEX_ELEMENT_COUNT = 8;
 export class Bone {
@@ -150,6 +150,7 @@ export function createCuboidMirrored([x, y, z], [width, height, depth], [u, v], 
     };
     const dh = dilation / 2;
     let { grassUvMod } = options;
+    const grassModU = u + (grassUvMod ? 0 : depth);
     const result = [
         // Left
         [
@@ -197,14 +198,14 @@ export function createCuboidMirrored([x, y, z], [width, height, depth], [u, v], 
         ],
         // Top
         [
-            createSkinVertex(x - dh, y + height + dh, z + depth + dh, u + (grassUvMod ? 0 : depth), v),
-            createSkinVertex(x - dh, y + height + dh, z - dh, u + (grassUvMod ? 0 : depth), v + depth),
-            createSkinVertex(x + width + dh, y + height + dh, z + depth + dh, u + (grassUvMod ? 0 : depth) + width, v),
+            createSkinVertex(x - dh, y + height + dh, z + depth + dh, grassModU + width, v),
+            createSkinVertex(x - dh, y + height + dh, z - dh, grassModU + width, v + depth),
+            createSkinVertex(x + width + dh, y + height + dh, z + depth + dh, grassModU, v),
         ],
         [
-            createSkinVertex(x - dh, y + height + dh, z - dh, u + (grassUvMod ? 0 : depth), v + depth),
-            createSkinVertex(x + width + dh, y + height + dh, z - dh, u + (grassUvMod ? 0 : depth) + width, v + depth),
-            createSkinVertex(x + width + dh, y + height + dh, z + depth + dh, u + (grassUvMod ? 0 : depth) + width, v),
+            createSkinVertex(x - dh, y + height + dh, z - dh, grassModU + width, v + depth),
+            createSkinVertex(x + width + dh, y + height + dh, z - dh, grassModU, v + depth),
+            createSkinVertex(x + width + dh, y + height + dh, z + depth + dh, grassModU, v),
         ],
         // Bottom
         [
@@ -225,6 +226,12 @@ export function createCuboidMirrored([x, y, z], [width, height, depth], [u, v], 
     ];
     return result;
 }
+export var PoseType;
+(function (PoseType) {
+    PoseType[PoseType["Walk"] = 0] = "Walk";
+    PoseType[PoseType["LookAtMouseCursor"] = 1] = "LookAtMouseCursor";
+    PoseType[PoseType["BackLookAtMouseCursor"] = 2] = "BackLookAtMouseCursor";
+})(PoseType || (PoseType = {}));
 export class SkinRenderer {
     // public uniforms: KDict<WebGLUniformLocation>;
     // public attributes: KDict<WebGLAttribLocation>;
@@ -233,9 +240,13 @@ export class SkinRenderer {
     skin;
     noGrass;
     noEeveeEars;
+    noCatEars;
+    noCatTail;
     noAnim;
     isGrass;
     isEeveeEars;
+    isCatEars;
+    isCatTail;
     modifyInnerHead;
     modifyOuterHead;
     seed;
@@ -244,7 +255,7 @@ export class SkinRenderer {
     // public program?: WebGLProgram;
     // public texture?: WebGLTexture;
     // public vertexBuffer?: WebGLBuffer;
-    poseType = 0;
+    poseType = PoseType.Walk;
     mousePos = [0, 0];
     mousePosO = null;
     mousePosRaw = [0, 0];
@@ -268,9 +279,15 @@ export class SkinRenderer {
         this.isGrass = false;
         this.noEeveeEars = false;
         this.isEeveeEars = false;
+        // Since: Cat update (v1.1.6)
+        this.noCatEars = false;
+        this.isCatEars = false;
+        this.noCatTail = false;
+        this.isCatTail = false;
         this.modifyInnerHead = false;
         this.modifyOuterHead = false;
-        this.seed = Math.random() * 20480;
+        const size = 20480;
+        this.seed = (Math.random() - 0.5) * 2 * size;
     }
     parseTexture() {
         const skinCanvas = document.createElement("canvas");
@@ -287,6 +304,7 @@ export class SkinRenderer {
         if (getPixelHex(grassData, 3) == 0xff3acb28 &&
             getPixelHex(grassData, 2) == 0xfff9ca8b &&
             getPixelHex(grassData, 1) == 0xffff859b) {
+            // Passes SkinModifier#validateKakaPalette check
             isGrass = true;
             log("SkinParse", `Identified valid grass skin: ${skin.src}`);
             const modifier = getPixel(grassData, 0);
@@ -305,6 +323,17 @@ export class SkinRenderer {
                 else {
                     validModifier = validModifier && modifier[2] == 0xff;
                 }
+            }
+            // Since: Cat update (v1.1.6)
+            const catEarsPixel = skinCtx.getImageData(62, 1, 1, 1).data;
+            if (getPixelHex(catEarsPixel, 0) == 0xffdb9c3e) {
+                log("SkinParse", `Identified valid cat ears skin: ${skin.src}`);
+                this.isCatEars = true;
+            }
+            const catTailPixel = skinCtx.getImageData(63, 1, 1, 1).data;
+            if (getPixelHex(catTailPixel, 0) == 0xff987b54) {
+                log("SkinParse", `Identified valid cat tail skin: ${skin.src}`);
+                this.isCatTail = true;
             }
         }
         else if (getPixelHex(grassData, 3) == 0xff51280c &&
@@ -325,7 +354,6 @@ export class SkinRenderer {
             requestAnimationFrame(() => {
                 this.parseTexture();
                 log("SkinRenderer", "Uploading texture data: " + this.skin.src);
-                CanvasRenderingContext2D;
                 this.uploadSkinTextureData(this.skin);
             });
         };
@@ -392,8 +420,12 @@ export class SkinRenderer {
             leftArm: [0, 0, 0],
             rightArm: [0, 0, 0],
             leftLeg: [0, 0, 0],
-            rightLeg: [0, 0, 0]
+            rightLeg: [0, 0, 0],
+            catTail1: [-45 * Math.PI / 180, 0, 0],
+            catTail2: [-45 * Math.PI / 180, 0, 0]
         };
+        // Smoothstep function
+        // The result gets "steppier" if the i is larger.
         const fn = (n, i) => {
             i ??= 1;
             let a = 0;
@@ -412,27 +444,29 @@ export class SkinRenderer {
             b = n;
             return lerp(a, b, i - f);
         };
-        if (this.poseType == 0) {
+        if (this.poseType == PoseType.Walk) {
             const anim = this.noAnim ? -Math.PI / 4 : lerp(-1, 1, fn(Math.sin(this.seed + performance.now() / animDuration) / 2 + 0.5, 0.25)) * Math.PI / 2.5;
             const headAnim = this.noAnim ? -Math.PI / 4 : lerp(-1, 1, fn(Math.sin(this.seed + performance.now() / animDuration * 2) / 2 + 0.5, 0.25)) * Math.PI / 2.5;
             const bodyRotY = anim * 0.125;
             pose = {
-                head: [-headAnim * 0.125, anim * 0.125, 0],
+                head: [-headAnim * 0.25 + 0.25, anim * 0.125, 0],
                 body: [0, bodyRotY, 0],
                 bodyInv: [0, -bodyRotY, 0],
                 leftArm: [anim, 0, 0],
                 rightArm: [-anim, 0, 0],
                 leftLeg: [-anim, 0, 0],
                 rightLeg: [anim, 0, 0],
+                catTail1: [-65 * Math.PI / 180 - headAnim * 0.125, 0, 0],
+                catTail2: [-45 * Math.PI / 180 - headAnim * 0.125, 0, 0],
             };
             const walkAnim = this.noAnim ? 0 : lerp(0, 1, Math.abs(Math.sin(this.seed + performance.now() / animDuration))) * Math.PI;
             globalTranslate[1] = walkAnim * 2;
             // var angle = (this.noAnim ? 195 : (Math.sin(performance.now() / 1000 * 160 / animDuration) * 30 + 180)) * Math.PI / 180;
-            const angle = (performance.now() / 1000 * 16 / 180 + 1) * Math.PI;
+            const angle = ((performance.now() / 1000 - 3) * 16 / 180 + 1) * Math.PI;
             camTx = Math.sin(angle) * 50;
             camTz = Math.cos(angle) * 50;
         }
-        else if (this.poseType == 1) {
+        else if (this.poseType == PoseType.LookAtMouseCursor || this.poseType == PoseType.BackLookAtMouseCursor) {
             let [mx, my] = this.mousePosO ?? [0, 0];
             const yaw = fn(clamp((mx / 12 + 1) / 2, 0, 1), 2.5);
             const pitch = fn(clamp((my / 12 + 1) / 2, 0, 1), 2.5);
@@ -440,14 +474,18 @@ export class SkinRenderer {
             const yRot = lerp(Math.PI / 2.25, -Math.PI / 2.25, yaw);
             const bodyXRot = xRot; // Math.min(0, xRot);
             pose.head = [xRot / 1.5, yRot / 1.5, 0];
-            pose.body = [bodyXRot, yRot / 2, 0];
+            pose.body = [bodyXRot, yRot / 2 + (this.poseType == PoseType.BackLookAtMouseCursor ? Math.PI : 0), 0];
             pose.bodyInv = [-bodyXRot, -yRot / 2, 0];
             camTy = 12;
         }
+        else {
+            warn("SkinRenderer", `Unknown pose type: ${this.poseType} (${PoseType[this.poseType]})`);
+        }
         let headBone;
+        let bodyBone;
         const outerDilation = 0.5;
         const bones = [
-            createBone([
+            bodyBone = createBone([
                 // Body (inner / outer)
                 createCuboid([-4, 0, -2], [8, 12, 4], [16, 16], 0.01),
                 createCuboid([-4, 0, -2], [8, 12, 4], [16, 32], 0.01 + outerDilation)
@@ -519,6 +557,26 @@ export class SkinRenderer {
                 createCuboid([2, 7, -0.5], [2, 1, 1], [58, 35]),
                 createCuboid([1, 6, -0.5], [3, 1, 1], [56, 41]),
             ], [1.5, 7, 0], [12.5 * Math.PI / 180, -7.5 * Math.PI / 180, -17.5 * Math.PI / 180]));
+        }
+        // Since: Cat update (v1.1.6)
+        if (!this.noCatEars && this.isCatEars) {
+            headBone.children.push(createBone([], [0, 8, -1], [0, 0, 0], [
+                createBone([
+                    createCuboid([0, 0, 0], [3, 2, 1], [56, 18])
+                ], [-4, 0, 0]),
+                createBone([
+                    createCuboidMirrored([0, 0, 0], [3, 2, 1], [56, 18])
+                ], [1, 0, 0])
+            ]));
+        }
+        if (!this.noCatTail && this.isCatTail) {
+            bodyBone.children.push(createBone([
+                createCuboid([0, -8, 0], [1, 8, 1], [56, 22])
+            ], [-0.5, 0.8, 0.75], pose.catTail1, [
+                createBone([
+                    createCuboid([0, -8, 0], [1, 8, 1], [60, 22])
+                ], [0, -8, 0], pose.catTail2)
+            ]));
         }
         const allBones = [];
         function addBonesToList(bone) {
